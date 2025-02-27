@@ -4,6 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [ ! -f "${SHARED_DIR}/gcp_min_permissions.json" ]; then
+  echo "No 'gcp_min_permissions.json' found, aborted." && exit 0
+fi
+
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
 sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
