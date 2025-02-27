@@ -21,12 +21,44 @@ then
   gcloud config set project "${GOOGLE_PROJECT_ID}"
 fi
 
+# jiwei-debug
+SA_PROJECT_ID="openshift-qe"
+if [[ "${GOOGLE_PROJECT_ID}" =~ openshift-gce-devel ]]; then
+  role_name="installer_qe_minimal_permissions"
+  gcloud iam roles describe --project "${GOOGLE_PROJECT_ID}" "${role_name}" || echo "The custom role '${role_name}' does not exist."
+fi
+
 # See https://docs.openshift.com/container-platform/4.12/installing/installing_gcp/installing-gcp-account.html#minimum-required-permissions-ipi-gcp_installing-gcp-account
 # There are pre-configured 2 IAM service accounts, along with some custom roles.
 # The IAM service account for IPI: ipi-min-permissions-sa@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com
 # The IAM service account for UPI: upi-min-permissions-sa@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com
 # Currently we only deal with IPI in Prow CI.
-iam_account="ipi-min-permissions-sa@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com"
+iam_account="ipi-min-permissions-sa@${SA_PROJECT_ID}.iam.gserviceaccount.com"
 
-gcloud iam service-accounts keys create "${SHARED_DIR}/gcp_min_permissions.json" --iam-account="${iam_account}" || exit 1
+display_name=$(gcloud --project "${SA_PROJECT_ID}" iam service-accounts list --filter="email=${iam_account}" --format='value(displayName)')
+if [[ -z "${display_name}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Failed to find the IAM service account '${iam_account}' in GCP project '${SA_PROJECT_ID}', abort."
+  exit 1
+fi
+
+gcloud --project "${SA_PROJECT_ID}" iam service-accounts keys create "${SHARED_DIR}/gcp_min_permissions.json" --iam-account="${iam_account}" || exit 1
 echo "$(date -u --rfc-3339=seconds) - Created a temporary key of the IAM service account for the minimum permissions testing on GCP."
+
+echo "$(date -u --rfc-3339=seconds) - Check the IAM service account's roles/permissions..."
+
+gcloud projects get-iam-policy "${GOOGLE_PROJECT_ID}" --flatten='bindings[].members' --format='table(bindings.role)' --filter="bindings.members:${iam_account}"
+
+readarray -t binding_roles < <(gcloud projects get-iam-policy "${GOOGLE_PROJECT_ID}" --flatten='bindings[].members' --format='table(bindings.role)' --filter="bindings.members:${iam_account}" | grep roles)
+for role in "${binding_roles[@]}"; do
+  if [[ "${role}" =~ "projects/" ]]; then
+    # Example: projects/openshift-qe/roles/jiwei_compute_admin
+    project=$(echo "${role}" | awk -F/ '{print $2}')
+    role_name=$(echo "${role}" | awk -F/ '{print $4}')
+    CMD="gcloud iam roles describe --project=${project} ${role_name}"
+  else
+    # Example: roles/compute.admin
+    CMD="gcloud iam roles describe ${role}"
+  fi
+  echo "Running Command: ${CMD}"
+  eval "${CMD}"
+done
