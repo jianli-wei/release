@@ -11,4 +11,9 @@ cat <<EOF > ${SHARED_DIR}/proxy_whitelist.txt
 accounts.google.com
 EOF
 
+# temporarily allow the access to AWS 
+cat <<EOF >> ${SHARED_DIR}/proxy_whitelist.txt
+.amazonaws.com
+EOF
+
 cp ${SHARED_DIR}/proxy_whitelist.txt ${ARTIFACT_DIR}/
