@@ -1,0 +1,21 @@
+ref:
+  as: gcp-provision-firewalls
+  from_image:
+    namespace: ocp
+    name: "4.15"
+    tag: upi-installer
+  grace_period: 10m
+  commands: gcp-provision-firewalls-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: COMPUTE_NODES_TAGS
+    default: "preserved-ipi-xpn-compute"
+    documentation: Additional network tags applied to compute nodes, comma separated strings, e.g. "ocp-tag01,ocp-tag02".
+  - name: CONTROL_PLANE_NODES_TAGS
+    default: "preserved-ipi-xpn-control-plane"
+    documentation: Additional network tags applied to control-plane nodes, comma separated strings, e.g. "ocp-tag01,ocp-tag02".
+  documentation: |-
+    The GCP step creates firewall-rules for OpenShift installation, within the given VPC network. 
