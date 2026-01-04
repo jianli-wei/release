@@ -33,9 +33,9 @@ fi
 ## Destroying DNS resources of mirror registry
 if [[ -f "${SHARED_DIR}/mirror-dns-destroy.sh" ]]; then
   echo "$(date -u --rfc-3339=seconds) - Destroying DNS resources of mirror registry..."
-  sh "${SHARED_DIR}/mirror-dns-destroy.sh"
+  sh "${SHARED_DIR}/mirror-dns-destroy.sh" || echo "Error on destroing DNS resources of mirror registry."
 fi
 
 ## Destroy the SSH bastion
 echo "$(date -u --rfc-3339=seconds) - Destroying the bastion host..."
-sh "${SHARED_DIR}/bastion-destroy.sh"
+sh "${SHARED_DIR}/bastion-destroy.sh" || echo "Error on destroying the bastion host."
