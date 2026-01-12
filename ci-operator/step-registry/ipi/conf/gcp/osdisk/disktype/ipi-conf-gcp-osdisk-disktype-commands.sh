@@ -4,6 +4,15 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+## The logic may be a bit complicated here, let me try to explain. 
+# 1. If the env var COMPUTE_DISK_TYPE is specified explicitly, it'll be applied to compute nodes; 
+#    otherwise, the randomly chosen disk type will be applied to defaultMachinePlatform if it is not pd-standard.
+# 2. If the env var CONTROL_PLANE_DISK_TYPE is specified explicitly, it'll be applied to control-plane nodes; 
+#    otherwise, the randomly chosen disk type will be applied to defaultMachinePlatform. 
+# 3. If the env var DEFAULT_MACHINE_PLATFORM_DISK_TYPE is specified explicitly, it'll be applied to defaultMachinePlatform. 
+# 4. If there are multiple updates on defaultMachinePlatform, the last updates takes effect finally. 
+##
+
 # release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST:-}"
 # seem like release-controller does not expose RELEASE_IMAGE_INITIAL, even job configuraiton defines 
@@ -66,9 +75,11 @@ PATCH="${SHARED_DIR}/install-config-patch.yaml"
 
 # the OCP version supports disk type "pd-balanced"
 EXPECTED_OCP_VERSION="4.14"
+# the OCP version supports disk types "pd-balanced" and "hyperdisk-balanced"
+#EXPECTED_OCP_VERSION2="4.16"
 
 if [ -n "${COMPUTE_DISK_TYPE}" ]; then
-  disk_type="${COMPUTE_DISK_TYPE}"
+  compute_disk_type="${COMPUTE_DISK_TYPE}"
 else
   if version_check "${EXPECTED_OCP_VERSION}"; then
     valid_types=("pd-balanced" "pd-ssd" "pd-standard")
@@ -80,25 +91,89 @@ else
 
   count=${#valid_types[@]}
   selected_index=$(( RANDOM % ${count} ))
-  disk_type=${valid_types[${selected_index}]}
-  echo "INFO: Selected osDisk.diskType '${disk_type}' for cluster compute nodes."
+  compute_disk_type=${valid_types[${selected_index}]}
+  echo "INFO: Selected osDisk.diskType '${compute_disk_type}' for cluster compute nodes."
 fi
 
-# if the selected diskType is the default pd-ssd, leave as it is
-# otherwise, update the install-config
-if [[ "${disk_type}" != "pd-ssd" ]]; then
+if [[ -n "${COMPUTE_DISK_TYPE}" ]]; then
   cat > "${PATCH}" << EOF
 compute:
 - name: worker
   platform:
     gcp:
       osDisk: 
-        diskType: ${disk_type}
+        diskType: ${compute_disk_type}
 EOF
   yq-go m -x -i "${CONFIG}" "${PATCH}"
-  echo "Updated compute.platform.gcp.osDisk.diskType in '${CONFIG}'."
+  echo "Updated compute[0].platform.gcp.osDisk.diskType in '${CONFIG}'."
   yq-go r "${CONFIG}" compute
+elif [[ ! "${compute_disk_type}" == pd-standard ]]; then
+  cat > "${PATCH}" << EOF
+platform:
+  gcp:
+    defaultMachinePlatform:
+      osDisk: 
+        diskType: ${compute_disk_type}
+EOF
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
+  echo "Updated platform.gcp.defaultMachinePlatform.osDisk.diskType in '${CONFIG}'."
+  yq-go r "${CONFIG}" platform
+else
+  echo "The selected compute disk type '${compute_disk_type}' is ignored."
 fi
 
-# save the selected osDisk.diskType for possible post-installation check
-echo "${disk_type}" > ${SHARED_DIR}/compute-osdisk-disktype
+if [ -n "${CONTROL_PLANE_DISK_TYPE}" ]; then
+  control_plane_disk_type="${CONTROL_PLANE_DISK_TYPE}"
+else
+  if version_check "${EXPECTED_OCP_VERSION}"; then
+    #valid_types=("pd-balanced" "pd-ssd" "hyperdisk-balanced")
+    valid_types=("pd-balanced" "pd-ssd")
+  else
+    valid_types=("pd-ssd")
+  fi
+  echo -n "INFO: Valid disk types are "
+  echo "${valid_types[@]}"
+
+  count=${#valid_types[@]}
+  selected_index=$(( RANDOM % ${count} ))
+  control_plane_disk_type=${valid_types[${selected_index}]}
+  echo "INFO: Selected osDisk.diskType '${control_plane_disk_type}' for cluster control-plane nodes."
+fi
+
+if [ -n "${CONTROL_PLANE_DISK_TYPE}" ]; then
+  cat > "${PATCH}" << EOF
+controlPlane:
+  name: master
+  platform:
+    gcp:
+      osDisk: 
+        diskType: ${control_plane_disk_type}
+EOF
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
+  echo "Updated controlPlane.platform.gcp.osDisk.diskType in '${CONFIG}'."
+  yq-go r "${CONFIG}" controlPlane
+else
+  cat > "${PATCH}" << EOF
+platform:
+  gcp:
+    defaultMachinePlatform:
+      osDisk: 
+        diskType: ${control_plane_disk_type}
+EOF
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
+  echo "Updated platform.gcp.defaultMachinePlatform.osDisk.diskType in '${CONFIG}'."
+  yq-go r "${CONFIG}" platform
+fi
+
+if [ -n "${DEFAULT_MACHINE_PLATFORM_DISK_TYPE}" ]; then
+  cat > "${PATCH}" << EOF
+platform:
+  gcp:
+    defaultMachinePlatform:
+      osDisk: 
+        diskType: ${DEFAULT_MACHINE_PLATFORM_DISK_TYPE}
+EOF
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
+  echo "Updated platform.gcp.defaultMachinePlatform.osDisk.diskType in '${CONFIG}'."
+  yq-go r "${CONFIG}" platform
+fi
