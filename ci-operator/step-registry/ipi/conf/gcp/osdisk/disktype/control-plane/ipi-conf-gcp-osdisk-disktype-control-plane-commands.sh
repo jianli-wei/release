@@ -69,6 +69,8 @@ EXPECTED_OCP_VERSION2="4.16"
 
 if [ -n "${CONTROL_PLANE_DISK_TYPE}" ]; then
   disk_type="${CONTROL_PLANE_DISK_TYPE}"
+elif [ -n "${DEAFULT_MACHINE_PLATFORM_DISK_TYPE}" ]; then
+  disk_type="${DEAFULT_MACHINE_PLATFORM_DISK_TYPE}"
 else
   if version_check "${EXPECTED_OCP_VERSION2}"; then
     #valid_types=("pd-balanced" "pd-ssd" "hyperdisk-balanced")
@@ -85,9 +87,7 @@ else
   echo "INFO: Selected osDisk.diskType '${disk_type}' for cluster control-plane nodes."
 fi
 
-# if the selected diskType is the default pd-ssd, leave as it is
-# otherwise, update the install-config
-if [[ "${disk_type}" != "pd-ssd" ]]; then
+if [ -n "${CONTROL_PLANE_DISK_TYPE}" ]; then
   cat > "${PATCH}" << EOF
 controlPlane:
   name: master
@@ -99,7 +99,15 @@ EOF
   yq-go m -x -i "${CONFIG}" "${PATCH}"
   echo "Updated controlPlane.platform.gcp.osDisk.diskType in '${CONFIG}'."
   yq-go r "${CONFIG}" controlPlane
+else
+  cat > "${PATCH}" << EOF
+platform:
+  gcp:
+    defaultMachinePlatform:
+      osDisk: 
+        diskType: ${disk_type}
+EOF
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
+  echo "Updated platform.gcp.defaultMachinePlatform.osDisk.diskType in '${CONFIG}'."
+  yq-go r "${CONFIG}" platform
 fi
-
-# save the selected osDisk.diskType for possible post-installation check
-echo "${disk_type}" > ${SHARED_DIR}/control-plane-osdisk-disktype

@@ -72,15 +72,9 @@ tests:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      MINIMAL_PERMISSIONS_WITHOUT_FIREWALL_PROVISION: "yes"
-      SLEEP_DURATION: 10m
-    post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-byo-fw-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-byo-fw-provision
-    test:
-    - chain: cucushift-installer-check-cluster-health
+      COMPUTE_NODE_REPLICAS: "2"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: installer-rehearse-gcp-wif
   cron: '@yearly'
   steps:

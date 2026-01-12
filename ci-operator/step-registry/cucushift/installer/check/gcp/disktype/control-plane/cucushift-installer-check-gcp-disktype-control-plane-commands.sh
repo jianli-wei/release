@@ -12,10 +12,6 @@ set -o pipefail
 EXIT_CODE=101
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-post-check-status.txt"' EXIT TERM
 
-if [ ! -f "${SHARED_DIR}/control-plane-osdisk-disktype" ]; then
-  echo "$(date -u --rfc-3339=seconds) - Nothing to do, skip." && exit 0
-fi
-
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
@@ -28,7 +24,14 @@ then
 fi
 
 ## The expected OS disk type of compute nodes
-expected_disk_type=$(cat "${SHARED_DIR}/control-plane-osdisk-disktype")
+control_plane_disk_type=$(yq-go r "${SHARED_DIR}/install-config.yaml" controlPlane.platform.gcp.osDisk.diskType)
+if [ -z "${control_plane_disk_type}" ]; then
+  control_plane_disk_type=$(yq-go r "${SHARED_DIR}/install-config.yaml" platform.gcp.defaultMachinePlatform.osDisk.diskType)
+fi
+if [ -z "${control_plane_disk_type}" ]; then
+  control_plane_disk_type="pd-ssd"
+fi
+expected_disk_type="${control_plane_disk_type}"
 
 ## Try the validation
 ret=0

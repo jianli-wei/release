@@ -13,5 +13,8 @@ ref:
   - name: CONTROL_PLANE_DISK_TYPE
     default: ""
     documentation: The OS disk type of control-plane nodes. The valid values are, "pd-balanced", "pd-ssd", and "hyperdisk-balanced". If empty, the step will randomly choose a type from ["pd-balanced", "pd-ssd"] for cluster control-plane nodes.
+  - name: DEAFULT_MACHINE_PLATFORM_DISK_TYPE
+    default: ""
+    documentation: The OS disk type of defaultMachinePlatform. The valid values are, "pd-balanced", "pd-ssd", and "hyperdisk-balanced". If empty, the step will randomly choose a type from ["pd-balanced", "pd-ssd"] for cluster nodes.
   documentation: >-
-    The IPI configure step updates install-config.yaml to insert controlPlane.platform.gcp.osDisk.diskType settings.
+    The IPI configure step updates install-config.yaml to insert controlPlane.platform.gcp.osDisk.diskType or platform.gcp.defaultMachinePlatform.osDisk.diskType settings.

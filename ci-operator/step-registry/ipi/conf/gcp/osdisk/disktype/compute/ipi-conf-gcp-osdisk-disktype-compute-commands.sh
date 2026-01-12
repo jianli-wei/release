@@ -96,9 +96,6 @@ compute:
         diskType: ${disk_type}
 EOF
   yq-go m -x -i "${CONFIG}" "${PATCH}"
-  echo "Updated compute.platform.gcp.osDisk.diskType in '${CONFIG}'."
+  echo "Updated compute[0].platform.gcp.osDisk.diskType in '${CONFIG}'."
   yq-go r "${CONFIG}" compute
 fi
-
-# save the selected osDisk.diskType for possible post-installation check
-echo "${disk_type}" > ${SHARED_DIR}/compute-osdisk-disktype
