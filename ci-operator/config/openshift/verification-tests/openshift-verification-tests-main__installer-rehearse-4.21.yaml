@@ -77,7 +77,8 @@ tests:
     cluster_profile: gcp-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    workflow: cucushift-installer-rehearse-gcp-ipi-custom-endpoints
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-cases-valid-machine-type-os-disk-type-provision
 - as: installer-rehearse-gcp-regions
   cron: '@yearly'
   steps:
